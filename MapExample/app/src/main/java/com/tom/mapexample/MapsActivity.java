@@ -1,8 +1,8 @@
 package com.tom.mapexample;
 
-import android.app.Activity;
+import android.annotation.TargetApi;
 import android.content.Intent;
-import android.net.Uri;
+import android.content.res.Configuration;
 
 import android.Manifest;
 import android.content.Context;
@@ -10,19 +10,16 @@ import android.content.pm.PackageManager;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.AsyncTask;
+import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
-import android.support.v4.widget.DrawerLayout;
-import android.support.v7.app.ActionBarDrawerToggle;
-import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,18 +32,28 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
     private static final int REQUEST_LOCATION = 2;
     private GoogleMap mMap;
     GoogleApiClient mGoogleApiClient;
     LocationRequest locationRequest;
-    Location location;
-    private Button button;
+    String id = "id";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -141,12 +148,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 //連結到撥放器
                 Intent intent = getPackageManager().getLaunchIntentForPackage("tcking.github.com.giraffeplayer");
                 startActivity(intent);
-
-                //new AlertDialog.Builder(MapsActivity.this)
-                        //.setTitle(marker.getTitle())
-                        //.setMessage(marker.getSnippet())
-                        //.setPositiveButton("OK", null)
-                        //.show();
                 return false;
             }
         });
@@ -199,6 +200,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         );
     }
 
+    //手機旋轉不重開
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        // TODO Auto-generated method stub
+        super.onConfigurationChanged(newConfig);
+        if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            // 什麼都不用寫
+        }
+        else {
+            // 什麼都不用寫
+        }
+    }
+
+
     @Override
     protected void onStart() {
         mGoogleApiClient.connect();
@@ -249,11 +264,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    void buttonOnClick(View view) {
-
-        //連結到camera
-        Intent intent = getPackageManager().getLaunchIntentForPackage("net.ossrs.yasea.demo");
-        startActivity(intent);
+    public void b(View view) {
 
         Toast toast = Toast.makeText(this, "Add a new marker", Toast.LENGTH_SHORT);
         toast.show();
@@ -266,13 +277,142 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // 向系統查詢最合適的服務提供者名稱 ( 通常也是 "gps")
         String provider = locationManager.getBestProvider(criteria, true);
         //noinspection MissingPermission
-        Location location = locationManager.getLastKnownLocation(provider);
+        Location location = locationManager.getLastKnownLocation("network");
         if (location != null) {
             LatLng Now = new LatLng(location.getLatitude(),location.getLongitude());
             mMap.addMarker(new MarkerOptions()
                     .position(Now)
                     .title("Current Position"));
             mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(Now, 12));
+        }
+        else {
+            Log.d("SOCO", "COCO95");
+        }
+
+        String url = "rtmp://140.115.158.81:1935/live/123";
+        int random = (int) (Math.random()*100);
+        String rand = Integer.toString(random);
+        String method="register";
+        String longitude = String.valueOf(location.getLongitude());
+        String latitude = String.valueOf(location.getLatitude());
+        BackgroundTask backgroundTask=new BackgroundTask(this);
+        backgroundTask.execute(method,id,rand,longitude,latitude,url);//AsyncTask 提供了 execute 方法來執行(觸發)非同步工作
+
+        //連結到camera
+        Intent intent = getPackageManager().getLaunchIntentForPackage("net.ossrs.yasea.demo");
+        intent.putExtra("url", url);
+        startActivity(intent);
+    }
+
+    public void sync_b(View view) {
+
+
+//
+        TransTask transTask=new TransTask();
+        transTask.execute();//AsyncTask 提供了 execute 方法來執行(觸發)非同步工作
+
+    }
+
+    //解析JSON資料
+    private void parseJSON(String s) {
+        ArrayList<Transaction> trans = new ArrayList<>();
+        try {
+            Log.d("COCO", "COCO1");
+            JSONArray array = new JSONArray(s);
+            for (int i = 0; i < array.length(); i++) {
+                Log.d("COCO", "COCO3");
+                JSONObject obj = array.getJSONObject(i);
+                String id = obj.getString("id");
+                String rand = obj.getString("rand");
+                String latitude = obj.getString("latitude");
+                String longitude = obj.getString("longitude");
+                String url = obj.getString("url");
+                Log.d("COCO", "COCO4");
+
+                double latitude_in= Double.parseDouble(latitude);
+                double longitude_in= Double.parseDouble(longitude);
+                Log.d("COCO1", "COCO5");
+                LatLng Now = new LatLng(latitude_in,longitude_in);
+                Log.d("COCO1", "COCO6");
+                mMap.addMarker(new MarkerOptions()
+                        .position(Now)
+                        .title(id));
+
+                Log.d("COCO", id + "/" + rand + "/" + latitude + "/" + longitude + "/" + url);
+                Transaction t = new Transaction(id, rand, latitude, longitude, url);
+                trans.add(t);
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        Log.d("COCO", "COCO2");
+    }
+    public static String getJSONObjectFromURL(String urlString) throws IOException, JSONException {
+        Log.d("HIHI", "SSS");
+        HttpURLConnection urlConnection = null;
+
+        URL url = new URL(urlString);
+
+        urlConnection = (HttpURLConnection) url.openConnection();
+
+        urlConnection.setRequestMethod("GET");
+        urlConnection.setReadTimeout(10000 /* milliseconds */);
+        urlConnection.setConnectTimeout(15000 /* milliseconds */);
+
+        urlConnection.setDoOutput(true);
+        Log.d("HIHI", "SSS1");
+        urlConnection.connect();
+        Log.d("HIHI", "SSS2");
+        BufferedReader br=new BufferedReader(new InputStreamReader(url.openStream()));
+        Log.d("HIHI", "SSS3");
+        char[] buffer = new char[1024];
+        Log.d("HIHI", "SSS4");
+        String jsonString = new String();
+
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while ((line = br.readLine()) != null) {
+            sb.append(line+"\n");
+            Log.d("HIHI", line);
+        }
+        br.close();
+
+        return sb.toString();
+
+    }
+
+    class TransTask extends AsyncTask<Void, Void, String> {
+
+        String json_url="http://192.168.2.59/project/getjson.php";
+        @TargetApi(Build.VERSION_CODES.KITKAT)
+        @Override
+        protected String doInBackground(Void... voids) {
+            String result = null;
+            try {
+                 result = getJSONObjectFromURL(json_url);
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+           return result;
+        }
+
+        public TransTask(){super();}
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            parseJSON(result);
+        }
+
+        @Override
+        protected void onProgressUpdate(Void... values) {
+            super.onProgressUpdate(values);
         }
 
     }
